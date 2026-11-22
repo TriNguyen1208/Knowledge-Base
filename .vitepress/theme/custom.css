@@ -586,3 +586,59 @@ font[style] {
     transform: translateX(4px) !important;
   }
 }
+
+/* ========================================================
+   Translate selected Vietnamese text
+   ======================================================== */
+.selection-translate-menu {
+  position: fixed;
+  z-index: 1000;
+  min-width: 205px;
+  padding: 5px;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px;
+  background: var(--vp-c-bg);
+  box-shadow: var(--vp-shadow-3);
+}
+
+.selection-translate-menu button {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 5px;
+  color: var(--vp-c-text-1);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.selection-translate-menu button:hover {
+  color: var(--vp-c-brand-1);
+  background: var(--vp-c-bg-soft);
+}
+
+.selection-translation-inline {
+  margin: 8px 0 16px !important;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: var(--vp-c-bg-soft);
+  border-left: 3px solid var(--vp-c-brand-1);
+  color: var(--vp-c-text-2);
+  font-size: 0.95em;
+  font-style: italic;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.selection-translation-inline.is-complete {
+  color: var(--vp-c-text-1);
+  font-style: normal;
+}
+
+.selection-translation-inline.is-error {
+  color: var(--vp-c-danger-1);
+}

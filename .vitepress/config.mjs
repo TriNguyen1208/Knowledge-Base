@@ -448,6 +448,145 @@ export default defineConfig({
       `
     ],
 
+    // Dịch đoạn văn được chọn, hoạt động cả trong chế độ MPA production preview
+    [
+      'script',
+      {},
+      `
+      (function() {
+        var selectedText = '';
+        var targetBlock = null;
+        var translationElement = null;
+        var menu = null;
+
+        function getSelectedText() {
+          var selection = window.getSelection();
+          if (!selection || selection.isCollapsed || !selection.rangeCount) return '';
+
+          var range = selection.getRangeAt(0);
+          var node = range.commonAncestorContainer;
+          var container = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
+          var article = container && container.closest ? container.closest('.vp-doc') : null;
+          if (!article || (container.closest && container.closest('pre, code, .mermaid, mjx-container, .notranslate'))) return '';
+
+          return selection.toString().replace(/\\s+/g, ' ').trim().slice(0, 5000);
+        }
+
+        function closeMenu() {
+          if (menu) {
+            menu.remove();
+            menu = null;
+          }
+        }
+
+        function showMenuAt(x, y, text) {
+          closeMenu();
+          menu = document.createElement('div');
+          menu.className = 'selection-translate-menu notranslate';
+          menu.setAttribute('translate', 'no');
+          menu.style.left = Math.max(8, Math.min(x, window.innerWidth - 220)) + 'px';
+          menu.style.top = Math.max(8, Math.min(y, window.innerHeight - 70)) + 'px';
+
+          var button = document.createElement('button');
+          button.type = 'button';
+          button.innerHTML = '<span aria-hidden="true">🌐</span> Translate to English';
+          button.addEventListener('click', function() {
+            closeMenu();
+            translate(text);
+          });
+          menu.appendChild(button);
+          document.body.appendChild(menu);
+        }
+
+        function showMenu(event, text) {
+          showMenuAt(event.clientX, event.clientY, text);
+        }
+
+        function translate(source) {
+          if (!source || !targetBlock) return;
+          if (translationElement) translationElement.remove();
+
+          translationElement = document.createElement('p');
+          translationElement.className = 'selection-translation-inline notranslate';
+          translationElement.setAttribute('translate', 'no');
+          translationElement.textContent = 'Translating…';
+          targetBlock.insertAdjacentElement('afterend', translationElement);
+
+          fetch('https://api.mymemory.translated.net/get?q=' + encodeURIComponent(source) + '&langpair=vi|en', {
+            headers: { Accept: 'application/json' }
+          })
+            .then(function(response) {
+              if (!response.ok) throw new Error('The translation service returned an error.');
+              return response.json();
+            })
+            .then(function(data) {
+              var result = data && data.responseData && data.responseData.translatedText;
+              if (!result || !result.trim()) throw new Error('No translation was returned.');
+              translationElement.textContent = result.trim();
+              translationElement.classList.add('is-complete');
+            })
+            .catch(function(error) {
+              translationElement.textContent = error.message || 'Translation failed.';
+              translationElement.classList.add('is-error');
+            });
+        }
+
+        document.addEventListener('contextmenu', function(event) {
+          var text = getSelectedText();
+          if (!text) {
+            closeMenu();
+            return;
+          }
+
+          event.preventDefault();
+          selectedText = text;
+          var selection = window.getSelection();
+          var anchor = selection && selection.anchorNode;
+          var anchorElement = anchor && (anchor.nodeType === Node.TEXT_NODE ? anchor.parentElement : anchor);
+          targetBlock = anchorElement && anchorElement.closest
+            ? anchorElement.closest('p, li, blockquote, td, th')
+            : null;
+          showMenu(event, selectedText);
+        });
+
+        // Mobile browsers do not have a right-click event. Show the same action
+        // after the user selects text with a long press.
+        var mobileSelectionTimer = null;
+        document.addEventListener('selectionchange', function() {
+          if (window.innerWidth > 768) return;
+          clearTimeout(mobileSelectionTimer);
+          mobileSelectionTimer = setTimeout(function() {
+            var text = getSelectedText();
+            if (!text) {
+              closeMenu();
+              return;
+            }
+
+            var selection = window.getSelection();
+            var anchor = selection && selection.anchorNode;
+            var anchorElement = anchor && (anchor.nodeType === Node.TEXT_NODE ? anchor.parentElement : anchor);
+            targetBlock = anchorElement && anchorElement.closest
+              ? anchorElement.closest('p, li, blockquote, td, th')
+              : null;
+            if (!targetBlock || !selection.rangeCount) return;
+
+            selectedText = text;
+            var rect = selection.getRangeAt(0).getBoundingClientRect();
+            showMenuAt(rect.left + (rect.width / 2) - 102, rect.bottom + 8, selectedText);
+          }, 250);
+        });
+
+        document.addEventListener('click', function(event) {
+          if (!event.target.closest || !event.target.closest('.selection-translate-menu')) closeMenu();
+        });
+
+        document.addEventListener('keydown', function(event) {
+          if (event.key === 'Escape') closeMenu();
+        });
+      })();
+      `
+    ],
+
     // Script khởi tạo Google Translate Engine
     [
       'script',
