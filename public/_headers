@@ -1,0 +1,25 @@
+# ----------------------------------------------------------------------
+# CLOUDFLARE PAGES CACHE HEADERS CONFIGURATION
+# ----------------------------------------------------------------------
+
+# 1. Các tài nguyên tĩnh được Vite build có mã băm (Hashed Assets: JS, CSS, WebFonts):
+# - Cache tối đa 1 năm trên cả CDN và trình duyệt (immutable).
+# - Khi code thay đổi: Vite tự sinh mã hash mới -> tên file đổi -> tự động tải file mới.
+# - Khi code KHÔNG đổi: Tận dụng 100% cache CDN/trình duyệt, không tốn băng thông.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# 2. File icon tĩnh ở thư mục gốc (favicon, pwa icons):
+# Cache 1 ngày nhưng bắt buộc revalidate để cập nhật nếu có thay đổi.
+/favicon.svg
+  Cache-Control: public, max-age=86400, must-revalidate
+/apple-touch-icon.png
+  Cache-Control: public, max-age=86400, must-revalidate
+/pwa-*.png
+  Cache-Control: public, max-age=86400, must-revalidate
+
+# Lưu ý: Với tất cả các trang HTML và URL bài viết khác (clean URLs):
+# Cloudflare Pages mặc định đã cấu hình:
+#   Cache-Control: public, max-age=0, must-revalidate
+# Giúp trình duyệt luôn kiểm tra phiên bản mới mỗi khi bạn deploy,
+# và sẽ trả về '304 Not Modified' (dùng cache) khi không có gì thay đổi.

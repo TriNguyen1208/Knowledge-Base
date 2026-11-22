@@ -1,0 +1,588 @@
+:root {
+  --vp-c-brand-1: #6366f1;
+  --vp-c-brand-2: #4f46e5;
+  --vp-c-brand-3: #4338ca;
+  --vp-c-brand-soft: rgba(99, 102, 241, 0.14);
+
+  --vp-font-family-base: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --vp-font-family-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+.dark {
+  --vp-c-brand-1: #818cf8;
+  --vp-c-brand-2: #6366f1;
+  --vp-c-brand-3: #4f46e5;
+  --vp-c-brand-soft: rgba(129, 140, 248, 0.16);
+}
+
+/* ========================================================
+   Công thức Toán học (MathJax / KaTeX)
+   ======================================================== */
+.mjx-chtml, .katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.5rem 0;
+}
+
+/* ========================================================
+   Code blocks
+   ======================================================== */
+.vp-doc div[class*='language-'] {
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.dark .vp-doc div[class*='language-'] {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* ========================================================
+   Mermaid Diagrams - Khắc phục triệt để lỗi cắt chữ & tràn khung
+   ======================================================== */
+.mermaid {
+  display: flex;
+  justify-content: center;
+  overflow-x: auto;
+  margin: 1.75rem 0;
+  padding: 1.25rem 1rem;
+  background-color: var(--vp-c-bg-soft);
+  border-radius: 8px;
+  border: 1px solid var(--vp-c-divider);
+}
+
+/* Cho phép foreignObject hiển thị đầy đủ, không bị cắt cụt nội dung */
+.mermaid foreignObject {
+  overflow: visible !important;
+}
+
+/* Triệt tiêu margin 16px và line-height 28px của VitePress .vp-doc p */
+.mermaid p,
+.mermaid foreignObject p,
+.mermaid .nodeLabel p,
+.mermaid .node p {
+  margin: 0 !important;
+  padding: 0 !important;
+  line-height: 1.35 !important;
+  font-size: 13.5px !important;
+}
+
+/* Căn chỉnh div, span trong foreignObject */
+.mermaid foreignObject div {
+  overflow: visible !important;
+  line-height: 1.35 !important;
+  font-size: 13.5px !important;
+  padding: 0 !important;
+  word-break: break-word;
+  text-align: center;
+}
+
+.mermaid foreignObject span,
+.mermaid .nodeLabel {
+  margin: 0 !important;
+  padding: 0 !important;
+  line-height: 1.35 !important;
+}
+
+/* Đảm bảo toàn bộ thẻ SVG của Mermaid không bị cắt cụt */
+.mermaid svg {
+  overflow: visible !important;
+  max-width: 100% !important;
+  height: auto !important;
+}
+
+/* Bo góc mềm mại cho các khối node */
+.mermaid .node rect,
+.mermaid .node circle,
+.mermaid .node polygon {
+  rx: 6px;
+  ry: 6px;
+}
+
+.mermaid .label {
+  line-height: 1.35 !important;
+}
+
+/* ========================================================
+   Sidebar Collapse / Expand Styles (Desktop >= 960px)
+   ======================================================== */
+@media (min-width: 960px) {
+  /* 1. Thu gọn Sidebar */
+  body.sidebar-collapsed .VPSidebar {
+    transform: translateX(-100%) !important;
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+  }
+
+  /* 2. Mở rộng VPContent toàn màn hình khi Sidebar đóng */
+  body.sidebar-collapsed .VPContent.has-sidebar {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  /* 3. Điều chỉnh LocalNav */
+  body.sidebar-collapsed .VPLocalNav.has-sidebar {
+    padding-left: 32px !important;
+  }
+
+  /* 4. Điều chỉnh NavBar */
+  body.sidebar-collapsed .VPNavBar.has-sidebar .content {
+    padding-left: 32px !important;
+  }
+
+  body.sidebar-collapsed .VPNavBar.has-sidebar .title {
+    position: static !important;
+    width: auto !important;
+    padding: 0 16px 0 32px !important;
+  }
+
+  /* Hiệu ứng chuyển động mượt mà */
+  .VPSidebar {
+    transition: transform 0.3s cubic-bezier(0.2, 0, 0, 1), opacity 0.25s ease !important;
+  }
+
+  .VPContent.has-sidebar,
+  .VPLocalNav.has-sidebar,
+  .VPNavBar.has-sidebar .content {
+    transition: padding-left 0.3s cubic-bezier(0.2, 0, 0, 1), padding-right 0.3s cubic-bezier(0.2, 0, 0, 1) !important;
+  }
+
+  /* Đảo chiều icon mũi tên khi sidebar thu gọn */
+  body.sidebar-collapsed .sidebar-toggle-icon {
+    transform: scaleX(-1);
+  }
+}
+
+/* ========================================================
+   Căn giữa nội dung bài viết trên màn hình Desktop (>= 960px)
+   ======================================================== */
+@media (min-width: 960px) {
+  /* Giữ Sidebar cố định bên trái một cách tự nhiên */
+  .VPSidebar {
+    padding-left: 32px !important;
+    width: var(--vp-sidebar-width, 272px) !important;
+  }
+
+  .VPContent.has-sidebar {
+    padding-left: var(--vp-sidebar-width, 272px) !important;
+    padding-right: 0 !important;
+  }
+
+  /* Căn giữa toàn bộ khung tài liệu */
+  .VPDoc {
+    display: flex !important;
+    justify-content: center !important;
+    width: 100% !important;
+  }
+
+  .VPDoc .container {
+    margin: 0 auto !important;
+    display: flex !important;
+    justify-content: center !important;
+    max-width: 1240px !important;
+    width: 100% !important;
+  }
+
+  /* Khung nội dung chính căn giữa với độ rộng đọc lý tưởng (860px) */
+  .VPDoc .content {
+    margin: 0 auto !important;
+    max-width: 860px !important;
+    width: 100% !important;
+    padding-left: 20px !important;
+    padding-right: 20px !important;
+  }
+
+  .VPDoc .content-container,
+  .VPDoc.has-aside .content-container,
+  .VPDoc:not(.has-sidebar) .content,
+  .VPDoc:not(.has-sidebar) .content-container {
+    margin: 0 auto !important;
+    max-width: 860px !important;
+    width: 100% !important;
+  }
+
+  .vp-doc {
+    margin: 0 auto !important;
+    max-width: 860px !important;
+    width: 100% !important;
+  }
+
+  /* Footer bài viết & hộp disclaimer căn giữa đồng bộ */
+  .VPDocFooter,
+  .ai-disclaimer-box {
+    margin-left: auto !important;
+    margin-right: auto !important;
+    max-width: 860px !important;
+    width: 100% !important;
+  }
+}
+
+/* Khi màn hình siêu rộng (>= 1440px), loại bỏ padding lệch mặc định của VitePress */
+@media (min-width: 1440px) {
+  .VPSidebar {
+    padding-left: 32px !important;
+    width: var(--vp-sidebar-width, 272px) !important;
+  }
+
+  .VPContent.has-sidebar {
+    padding-left: var(--vp-sidebar-width, 272px) !important;
+    padding-right: 0 !important;
+  }
+
+  body.sidebar-collapsed .VPContent.has-sidebar {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+}
+
+/* ========================================================
+   Nút Sao chép Markdown (Raw Text) ở đầu bài viết
+   ======================================================== */
+.doc-actions-top {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  margin-bottom: 14px;
+  padding-bottom: 4px;
+}
+
+.copy-markdown-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 6px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--vp-c-text-2);
+  background-color: var(--vp-c-bg-soft);
+  border: 1px solid var(--vp-c-divider);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+  pointer-events: auto !important;
+}
+
+.copy-markdown-btn:hover {
+  color: var(--vp-c-brand-1);
+  background-color: var(--vp-c-bg-mute);
+  border-color: var(--vp-c-brand-1);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+
+.copy-markdown-btn.copied {
+  color: #059669 !important;
+  background-color: rgba(16, 185, 129, 0.12) !important;
+  border-color: #10b981 !important;
+  font-weight: 600;
+}
+
+.copy-markdown-btn .copy-icon {
+  flex-shrink: 0;
+  transition: transform 0.15s ease;
+}
+
+.copy-markdown-btn:hover .copy-icon {
+  transform: scale(1.08);
+}
+
+/* ========================================================
+   Khoảng cách giữa Logo/Tên trang (Study Docs) và Navbar Content
+   ======================================================== */
+.VPNavBar .container > .title {
+  margin-right: 28px;
+}
+
+@media (min-width: 960px) {
+  .VPNavBar:not(.has-sidebar) .content {
+    padding-left: 28px;
+  }
+}
+
+/* ========================================================
+   Hộp thông báo miễn trừ trách nhiệm AI ở chân bài viết
+   ======================================================== */
+.ai-disclaimer-box {
+  margin-top: 3.5rem;
+  margin-bottom: 1.5rem;
+  padding: 0.85rem 1.25rem;
+  background-color: var(--vp-c-warning-soft);
+  border: 1px solid var(--vp-c-warning-2);
+  border-left: 4px solid var(--vp-c-warning-1);
+  border-radius: 6px;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  color: var(--vp-c-text-1);
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.ai-disclaimer-icon {
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+/* ========================================================
+   Google Translate UI Polish & Cleanup
+   ======================================================== */
+/* 1. Ẩn thanh banner và iframe mặc định của Google Translate */
+.goog-te-banner-frame,
+.goog-te-banner-frame.skiptranslate,
+iframe.goog-te-banner-frame,
+.skiptranslate > iframe,
+.VIpgJd-ZVi9od-aZ2wEe-wOHMyf,
+.VIpgJd-ZVi9od-ORHb-OEVmcd,
+.VIpgJd-ZVi9od-SmfZ-OEVmcd {
+  display: none !important;
+  visibility: hidden !important;
+  height: 0 !important;
+}
+
+body {
+  top: 0px !important;
+  position: static !important;
+}
+
+body.translated-ltr,
+body.translated-rtl {
+  top: 0px !important;
+}
+
+/* 2. Ẩn widget gốc và popup tooltip hover của Google */
+#google_translate_element {
+  display: none !important;
+}
+
+#goog-gt-tt,
+.goog-te-balloon-frame,
+.goog-tooltip,
+.goog-tooltip:hover {
+  display: none !important;
+}
+
+/* 3. Loại bỏ gạch chân / màu nền của từ ngữ đã dịch */
+.goog-text-highlight {
+  background-color: transparent !important;
+  box-shadow: none !important;
+}
+
+font[style] {
+  background-color: transparent !important;
+  box-shadow: none !important;
+}
+
+/* 4. Bảo vệ phần tử kỹ thuật không bị dịch */
+.notranslate,
+[translate="no"] {
+  /* Native browser attribute */
+}
+
+/* ========================================================
+   Mobile Navigation & Sidebar Fixes for MPA Mode
+   ======================================================== */
+/* Đảm bảo các nút điều khiển trên Navbar nhận click xuyên qua container */
+.nav-custom-controls,
+.sidebar-toggle-wrapper,
+.sidebar-toggle-btn,
+.lang-toggle-wrapper,
+.lang-toggle-btn {
+  pointer-events: auto !important;
+}
+
+@media (max-width: 959px) {
+  /* 1. Đảm bảo Sidebar hiển thị chuẩn khi mở trên Mobile */
+  .VPSidebar.open {
+    opacity: 1 !important;
+    visibility: visible !important;
+    transform: translateX(0) !important;
+    pointer-events: auto !important;
+    z-index: var(--vp-z-index-sidebar, 60) !important;
+  }
+
+  /* 2. Backdrop làm mờ nền khi mở Sidebar hoặc Menu */
+  .VPBackdrop {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 50;
+    background-color: var(--vp-backdrop-bg-color, rgba(0, 0, 0, 0.6));
+    backdrop-filter: blur(2px);
+    transition: opacity 0.25s ease;
+  }
+}
+
+@media (max-width: 767px) {
+  /* 3. Hiển thị Menu Navbar dạng Dropdown toàn màn hình khi bấm nút 3 gạch */
+  body.nav-screen-open .VPNavBarMenu {
+    display: flex !important;
+    flex-direction: column !important;
+    position: fixed !important;
+    top: var(--vp-nav-height) !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    background-color: var(--vp-c-bg) !important;
+    padding: 24px 20px 96px !important;
+    overflow-y: auto !important;
+    z-index: 45 !important;
+    gap: 8px !important;
+  }
+
+  body.nav-screen-open .VPNavBarHamburger .top {
+    top: 6px !important;
+    transform: translateX(0) rotate(225deg) !important;
+  }
+  body.nav-screen-open .VPNavBarHamburger .middle {
+    top: 6px !important;
+    transform: translateX(16px) !important;
+  }
+  body.nav-screen-open .VPNavBarHamburger .bottom {
+    top: 6px !important;
+    transform: translateX(0) rotate(135deg) !important;
+  }
+
+  body.nav-screen-open .VPNavBarMenu .VPNavBarMenuLink {
+    padding: 10px 14px !important;
+    font-size: 15px !important;
+    font-weight: 600 !important;
+    border-radius: 6px !important;
+    color: var(--vp-c-text-1) !important;
+  }
+
+  body.nav-screen-open .VPNavBarMenu .VPFlyout {
+    width: 100% !important;
+  }
+
+  body.nav-screen-open .VPNavBarMenu .VPFlyout > .button {
+    width: 100% !important;
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    padding: 10px 14px !important;
+    font-size: 15px !important;
+    font-weight: 600 !important;
+    color: var(--vp-c-text-1) !important;
+    border-radius: 6px !important;
+  }
+
+  body.nav-screen-open .VPNavBarMenu .VPFlyout .menu {
+    position: static !important;
+    box-shadow: none !important;
+    border: none !important;
+    background: transparent !important;
+    padding-left: 12px !important;
+    display: none !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+  }
+
+  body.nav-screen-open .VPNavBarMenu .VPFlyout > .button[aria-expanded="true"] + .menu {
+    display: block !important;
+  }
+
+  body.nav-screen-open .VPNavBarMenu .VPMenu {
+    background: transparent !important;
+    box-shadow: none !important;
+    border: none !important;
+    padding: 4px 0 !important;
+  }
+
+  body.nav-screen-open .VPNavBarMenu .VPMenuGroup .title {
+    padding: 8px 14px 4px !important;
+    font-size: 12px !important;
+    color: var(--vp-c-text-3) !important;
+  }
+
+  body.nav-screen-open .VPNavBarMenu .VPMenuLink a {
+    padding: 8px 14px !important;
+    font-size: 14px !important;
+    color: var(--vp-c-text-2) !important;
+    display: block !important;
+    border-radius: 6px !important;
+  }
+
+  body.nav-screen-open .VPNavBarMenu .VPMenuLink a:hover {
+    color: var(--vp-c-brand-1) !important;
+    background-color: var(--vp-c-bg-soft) !important;
+  }
+
+  body.nav-screen-open .VPNavBarMenu .mega-menu-wrapper {
+    width: 100% !important;
+  }
+}
+
+/* ========================================================
+   Mega Menu 2 Cột trên Navbar Desktop (>= 768px)
+   ======================================================== */
+@media (min-width: 768px) {
+  .VPNavBarMenuGroup .VPFlyout .menu {
+    width: auto !important;
+    max-width: 920px !important;
+    left: auto !important;
+    right: 0 !important;
+  }
+
+  .VPNavBarMenuGroup .VPFlyout > .button[aria-expanded="true"] + .menu {
+    opacity: 1 !important;
+    visibility: visible !important;
+    transform: translateY(0) !important;
+    pointer-events: auto !important;
+  }
+
+  .VPNavBarMenuGroup .VPMenu {
+    max-height: calc(85vh - var(--vp-nav-height)) !important;
+    overflow-y: auto !important;
+    padding: 18px 22px !important;
+    border-radius: 12px !important;
+    box-shadow: var(--vp-shadow-3) !important;
+  }
+
+  .VPNavBarMenuGroup .VPMenu .items {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(320px, 420px)) !important;
+    gap: 22px 28px !important;
+    align-items: start !important;
+  }
+
+  .VPNavBarMenuGroup .VPMenuGroup {
+    margin: 0 !important;
+    padding: 0 !important;
+    border-top: none !important;
+  }
+
+  .VPNavBarMenuGroup .VPMenuGroup > .title {
+    padding: 0 0 8px 0 !important;
+    margin-bottom: 6px !important;
+    font-size: 13.5px !important;
+    font-weight: 700 !important;
+    color: var(--vp-c-brand-1) !important;
+    border-bottom: 2px solid var(--vp-c-brand-soft) !important;
+    letter-spacing: 0.2px !important;
+  }
+
+  .VPNavBarMenuGroup .VPMenuLink {
+    padding: 1px 0 !important;
+  }
+
+  .VPNavBarMenuGroup .VPMenuLink a {
+    display: block !important;
+    padding: 6px 10px !important;
+    border-radius: 6px !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    color: var(--vp-c-text-1) !important;
+    transition: all 0.15s ease !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  .VPNavBarMenuGroup .VPMenuLink a:hover {
+    background-color: var(--vp-c-bg-mute) !important;
+    color: var(--vp-c-brand-1) !important;
+    transform: translateX(4px) !important;
+  }
+}

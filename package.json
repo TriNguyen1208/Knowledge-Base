@@ -1,0 +1,24 @@
+{
+  "name": "studying-docs",
+  "version": "1.0.0",
+  "description": "Kho tài liệu nghiên cứu Khoa học máy tính & Trí tuệ nhân tạo",
+  "type": "module",
+  "scripts": {
+    "postinstall": "node scripts/patch-mathjax.js",
+    "dev": "vitepress dev --host",
+    "build": "NODE_OPTIONS=\"--max-old-space-size=24576\" vitepress build",
+    "start": "vitepress preview --host",
+    "deploy": "npx wrangler pages deploy .vitepress/dist --project-name=studying-docs",
+    "build-and-deploy": "npm run build && npx wrangler pages deploy .vitepress/dist --project-name=studying-docs"
+  },
+  "devDependencies": {
+    "@vite-pwa/vitepress": "^0.5.4",
+    "debug": "^4.4.3",
+    "markdown-it-mathjax3": "^4.3.2",
+    "mermaid": "^11.4.1",
+    "vite-plugin-pwa": "^0.21.2",
+    "vitepress": "^1.6.4",
+    "vitepress-plugin-mermaid": "^2.0.17",
+    "wrangler": "^4.162.0"
+  }
+}
