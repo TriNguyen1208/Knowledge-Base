@@ -8,8 +8,8 @@
     "dev": "vitepress dev --host",
     "build": "NODE_OPTIONS=\"--max-old-space-size=24576\" vitepress build",
     "start": "vitepress preview --host",
-    "deploy": "npx wrangler pages deploy .vitepress/dist --project-name=studying-docs",
-    "build-and-deploy": "npm run build && npx wrangler pages deploy .vitepress/dist --project-name=studying-docs"
+    "deploy": "npx wrangler pages deploy .vitepress/dist --project-name=studying-docs --branch=production-study-with-me",
+    "build-and-deploy": "npm run build && npx wrangler pages deploy .vitepress/dist --project-name=studying-docs --branch=production-study-with-me"
   },
   "devDependencies": {
     "@vite-pwa/vitepress": "^0.5.4",

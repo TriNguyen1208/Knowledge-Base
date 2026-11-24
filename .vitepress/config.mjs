@@ -1,9 +1,18 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import { defineConfig } from 'vitepress';
-import { generateAutoSidebar, generateAutoNavbar, generateMegaMenuData } from './sidebar.mjs';
+import { generateAutoSidebar, generateAutoNavbar, generateMegaMenuData, getAudioTracks } from './sidebar.mjs';
 
 const autoSidebar = generateAutoSidebar('.');
 const autoNavbar = generateAutoNavbar('.');
 const megaMenuData = generateMegaMenuData('.');
+const audioTracks = getAudioTracks('.');
+
+try {
+  fs.writeFileSync(path.resolve('public/audio-list.json'), JSON.stringify(audioTracks, null, 2), 'utf-8');
+} catch (e) {
+  // ignore
+}
 
 export default defineConfig({
   title: 'Knowledge Base',
@@ -26,6 +35,14 @@ export default defineConfig({
     ['meta', { name: 'apple-mobile-web-app-status-bar-style', content: 'black-translucent' }],
     ['meta', { name: 'apple-mobile-web-app-title', content: 'StudyDocs' }],
     ['meta', { name: 'mobile-web-app-capable', content: 'yes' }],
+
+    // Cấu hình dữ liệu danh sách nhạc và nạp trình phát nhạc Audio Player
+    [
+      'script',
+      {},
+      `window.__AUDIO_TRACKS__ = ${JSON.stringify(audioTracks)};`
+    ],
+    ['script', { src: '/audio-player.js', defer: '' }],
 
     // Script tương tác client siêu nhẹ cho chế độ MPA: Quản lý Sidebar, Dark Mode, Ngôn ngữ & Mermaid
     [
@@ -737,6 +754,7 @@ export default defineConfig({
   },
 
   themeConfig: {
+    audioTracks: audioTracks,
     siteTitle: '📚 Study Docs',
     logo: { text: '🧠' },
 

@@ -3,6 +3,7 @@ import DefaultTheme from 'vitepress/theme';
 import SidebarToggle from './components/SidebarToggle.vue';
 import LanguageToggle from './components/LanguageToggle.vue';
 import CopyMarkdownButton from './components/CopyMarkdownButton.vue';
+import AudioPlayer from './components/AudioPlayer.vue';
 
 const { Layout } = DefaultTheme;
 </script>
@@ -15,6 +16,11 @@ const { Layout } = DefaultTheme;
         <SidebarToggle />
         <LanguageToggle />
       </div>
+    </template>
+
+    <!-- Gắn thanh phát nhạc kế bên nút Darkmode trên thanh Navbar -->
+    <template #nav-bar-content-after>
+      <AudioPlayer />
     </template>
 
     <!-- Nút Copy Markdown ở đầu bài viết (Phương án 1) -->

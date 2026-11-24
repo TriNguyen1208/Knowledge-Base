@@ -5,13 +5,6 @@ hero:
   name: "Tài liệu các lĩnh vực"
   text: "Hệ thống Tri thức & Lý thuyết Chuyên sâu"
   tagline: "Toàn bộ tài liệu ở mọi lĩnh vực được tổ chức khoa học dưới dạng cây"
-  actions:
-    - theme: brand
-      text: 🧠 Khám phá Trí tuệ Nhân tạo (AI) →
-      link: /Studying-Artificial-Intelligence/01_Mathematical_Foundations_For_AI/01_Linear_Algebra/01_Tensors_and_Memory_Layouts
-    - theme: alt
-      text: 💻 Khoa học Máy tính (CS) →
-      link: /Studying-Computer-Science/1.Programming_Fundamentals/01_Programming_Paradigms/1.1_Imperative_Programming
 
 features:
   - icon: 🌲

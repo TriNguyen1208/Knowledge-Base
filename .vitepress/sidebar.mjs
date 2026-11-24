@@ -273,3 +273,32 @@ export function generateAutoNavbar(baseDir = '.') {
     },
   ];
 }
+
+/**
+ * Tự động đọc danh sách file nhạc từ public/audio
+ * - Lấy tên file làm tên bài hát
+ * - Xử lý dấu "_" thành khoảng trắng và chuẩn hóa Unicode (NFC)
+ */
+export function getAudioTracks(baseDir = '.') {
+  const audioDir = path.resolve(baseDir, 'public/audio');
+  if (!fs.existsSync(audioDir)) return [];
+
+  const files = fs.readdirSync(audioDir);
+  const audioExtensions = new Set(['.mp3', '.wav', '.ogg', '.m4a', '.flac', '.aac']);
+
+  return files
+    .filter((f) => audioExtensions.has(path.extname(f).toLowerCase()))
+    .sort((a, b) => a.localeCompare(b, 'vi'))
+    .map((file) => {
+      const ext = path.extname(file);
+      const raw = path.basename(file, ext);
+      // Xử lý dấu "_" thành khoảng trắng và chuẩn hóa Unicode tiếng Việt NFC
+      const title = raw.replace(/_+/g, ' ').trim().normalize('NFC');
+      return {
+        title,
+        src: `/audio/${encodeURI(file)}`,
+        file,
+      };
+    });
+}
+
