@@ -3,6 +3,7 @@ import DefaultTheme from 'vitepress/theme';
 import SidebarToggle from './components/SidebarToggle.vue';
 import LanguageToggle from './components/LanguageToggle.vue';
 import CopyMarkdownButton from './components/CopyMarkdownButton.vue';
+import AskAiButton from './components/AskAiButton.vue';
 import AudioPlayer from './components/AudioPlayer.vue';
 
 const { Layout } = DefaultTheme;
@@ -23,9 +24,10 @@ const { Layout } = DefaultTheme;
       <AudioPlayer />
     </template>
 
-    <!-- Nút Copy Markdown ở đầu bài viết (Phương án 1) -->
+    <!-- Thanh công cụ đầu bài viết: Hỏi AI & Sao chép Markdown -->
     <template #doc-before>
       <div class="doc-actions-top">
+        <AskAiButton />
         <CopyMarkdownButton />
       </div>
     </template>
@@ -57,7 +59,9 @@ const { Layout } = DefaultTheme;
   display: flex;
   justify-content: flex-end;
   align-items: center;
+  gap: 8px;
   margin-bottom: 12px;
   padding-bottom: 4px;
+  flex-wrap: wrap;
 }
 </style>

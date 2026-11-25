@@ -30,6 +30,7 @@ export default defineConfig({
     ['link', { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' }],
     ['link', { rel: 'icon', type: 'image/png', sizes: '192x192', href: '/pwa-192x192.png' }],
     ['link', { rel: 'apple-touch-icon', href: '/apple-touch-icon.png' }],
+    ['link', { rel: 'manifest', href: '/manifest.webmanifest' }],
     ['meta', { name: 'theme-color', content: '#6366f1' }],
     ['meta', { name: 'apple-mobile-web-app-capable', content: 'yes' }],
     ['meta', { name: 'apple-mobile-web-app-status-bar-style', content: 'black-translucent' }],
@@ -50,8 +51,22 @@ export default defineConfig({
       {},
       `
       (function() {
+        function storageGet(key) {
+          try {
+            return typeof localStorage !== 'undefined' ? localStorage.getItem(key) : null;
+          } catch (e) {
+            return null;
+          }
+        }
+
+        function storageSet(key, val) {
+          try {
+            if (typeof localStorage !== 'undefined') localStorage.setItem(key, val);
+          } catch (e) {}
+        }
+
         // 1. Phục hồi trạng thái Sidebar đã lưu trước khi render giao diện
-        if (typeof localStorage !== 'undefined' && localStorage.getItem('vp-sidebar-collapsed') === 'true') {
+        if (storageGet('vp-sidebar-collapsed') === 'true') {
           document.documentElement.classList.add('sidebar-collapsed-init');
         }
 
@@ -63,10 +78,8 @@ export default defineConfig({
             var val = decodeURIComponent(match[1]);
             if (val.includes('/en')) return 'en';
           }
-          if (typeof localStorage !== 'undefined') {
-            var saved = localStorage.getItem('study_doc_lang');
-            if (saved === 'en') return 'en';
-          }
+          var saved = storageGet('study_doc_lang');
+          if (saved === 'en') return 'en';
           return 'vi';
         }
 
@@ -134,273 +147,455 @@ export default defineConfig({
           }
         }
 
-        // --- Khởi tạo khi DOM đã sẵn sàng ---
-        document.addEventListener('DOMContentLoaded', function() {
-          // 1. Phục hồi trạng thái Sidebar
-          if (localStorage.getItem('vp-sidebar-collapsed') === 'true') {
-            document.body.classList.add('sidebar-collapsed');
+        function isIosStandalone() {
+          try {
+            if (typeof window === 'undefined' || !window.navigator) return false;
+            if (window.navigator.standalone === true) return true;
+            var isAppleMobile = /iPhone|iPad|iPod/i.test(window.navigator.userAgent || '');
+            return !!(isAppleMobile && window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+          } catch (e) {
+            return false;
           }
-          syncSidebarUI();
+        }
 
-          // 2. Đồng bộ trạng thái Dark Mode
-          syncDarkModeUI();
+        function closeMobileDrawers() {
+          var sidebar = document.querySelector('.VPSidebar');
+          if (sidebar) sidebar.classList.remove('open');
+          var backdrop = document.querySelector('.VPBackdrop');
+          if (backdrop) backdrop.style.display = 'none';
+          var localNavBtn = document.querySelector('.VPLocalNav .menu');
+          if (localNavBtn) localNavBtn.setAttribute('aria-expanded', 'false');
+          document.body.classList.remove('nav-screen-open');
+          var hamburger = document.querySelector('.VPNavBarHamburger');
+          if (hamburger) {
+            hamburger.classList.remove('active');
+            hamburger.setAttribute('aria-expanded', 'false');
+          }
+          document.body.style.overflow = '';
+        }
 
-          // 3. Đồng bộ trạng thái Ngôn ngữ
-          var currentLang = readCurrentLang();
-          updateLanguageUI(currentLang === 'en');
-
-          // 4. Bắt các sự kiện click tương tác
-          document.addEventListener('click', function(e) {
-            // A. Đổi giao diện Sáng / Tối (Dark / Light Mode)
-            var themeBtn = e.target.closest('.VPSwitchAppearance');
-            if (themeBtn) {
-              var isDark = document.documentElement.classList.toggle('dark');
-              localStorage.setItem('vitepress-theme-appearance', isDark ? 'dark' : 'light');
-              syncDarkModeUI();
-              return;
+        // Trong chế độ PWA Standalone trên iOS, loại bỏ thuộc tính href trên link nội bộ
+        // (chuyển sang data-spa-href) để ngăn WebKit tự ý bật SFSafariViewController ("Done")
+        function neutralizeStandaloneLinks() {
+          if (!isIosStandalone()) return;
+          try {
+            var anchors = document.querySelectorAll('a[href]');
+            for (var i = 0; i < anchors.length; i++) {
+              var a = anchors[i];
+              var raw = a.getAttribute('href');
+              if (!raw || raw.charAt(0) === '#') continue;
+              if (raw.indexOf('mailto:') === 0 || raw.indexOf('tel:') === 0 || raw.indexOf('javascript:') === 0) continue;
+              if (a.getAttribute('target') === '_blank' || a.hasAttribute('download')) continue;
+              try {
+                var u = new URL(raw, window.location.href);
+                if (u.origin === window.location.origin) {
+                  if (u.pathname === window.location.pathname && u.search === window.location.search && u.hash) continue;
+                  a.setAttribute('data-spa-href', raw);
+                  a.removeAttribute('href');
+                  if (!a.hasAttribute('role')) a.setAttribute('role', 'link');
+                  if (!a.hasAttribute('tabindex')) a.setAttribute('tabindex', '0');
+                  a.style.cursor = 'pointer';
+                }
+              } catch (err) {}
             }
+          } catch (err) {}
+        }
 
-            // B. Đổi Ngôn ngữ (Language Switcher)
-            var langBtn = e.target.closest('.lang-toggle-btn');
-            if (langBtn) {
-              if (langBtn.classList.contains('is-loading')) return;
-              langBtn.classList.add('is-loading');
+        // --- 0. SPA Navigation (PJAX) cho chế độ MPA ---
+        // Chuyển trang tức thì không tải lại trang, giữ trọn vẹn 100% chế độ PWA Standalone trên iOS (không bao giờ bung Safari "Done")
+        var spaNavToken = 0;
+        function navigateSpa(url, push) {
+          var myToken = ++spaNavToken;
+          fetch(url, { credentials: 'same-origin' })
+            .then(function(res) {
+              if (!res.ok) throw new Error('HTTP ' + res.status);
+              return res.text();
+            })
+            .then(function(html) {
+              if (myToken !== spaNavToken) return;
+              var parser = new DOMParser();
+              var doc = parser.parseFromString(html, 'text/html');
 
-              var cur = readCurrentLang();
-              var targetLang = cur === 'en' ? 'vi' : 'en';
-
-              if (typeof localStorage !== 'undefined') {
-                localStorage.setItem('study_doc_lang', targetLang);
+              if (doc.title) {
+                document.title = doc.title;
               }
 
-              setGoogleTransCookie(targetLang);
-              updateLanguageUI(targetLang === 'en');
+              var newApp = doc.querySelector('#app');
+              var curApp = document.querySelector('#app');
+              if (!newApp || !curApp || !newApp.innerHTML || !newApp.innerHTML.trim()) {
+                throw new Error('Missing #app container');
+              }
+              curApp.innerHTML = newApp.innerHTML;
 
-              var select = document.querySelector('.goog-te-combo');
-              if (select && select.value !== targetLang) {
-                select.value = targetLang;
-                select.dispatchEvent(new Event('change'));
+              if (push !== false) {
+                try {
+                  history.pushState({ __spa: true }, '', url);
+                } catch (e) {}
+              }
 
-                if (targetLang === 'vi') {
-                  setTimeout(function() {
-                    window.location.reload();
-                  }, 100);
-                  return;
-                }
-                setTimeout(function() {
-                  langBtn.classList.remove('is-loading');
-                }, 400);
-              } else {
+              try {
+                window.scrollTo(0, 0);
+                if (document.documentElement) document.documentElement.scrollTop = 0;
+                if (document.body) document.body.scrollTop = 0;
+              } catch (e) {}
+
+              // Đồng bộ lại UI trong try/catch để lỗi phụ không bao giờ kích hoạt reload trang
+              try {
+                closeMobileDrawers();
+                neutralizeStandaloneLinks();
+                syncDarkModeUI();
+                syncSidebarUI();
+                var currentLang = readCurrentLang();
+                updateLanguageUI(currentLang === 'en');
+                protectTechnicalElements();
+                renderMermaid();
+              } catch (e) {
+                console.warn('SPA post-render sync warning:', e);
+              }
+
+              try {
+                window.dispatchEvent(new Event('popstate'));
+              } catch (e) {}
+            })
+            .catch(function(err) {
+              if (myToken !== spaNavToken) return;
+              console.warn('SPA Navigation fallback:', err);
+              window.location.href = url;
+            });
+        }
+
+        function handleGlobalClick(e) {
+          var rawTarget = e.target;
+          var targetEl = rawTarget && rawTarget.nodeType === 3 ? rawTarget.parentElement : rawTarget;
+          if (!targetEl || !targetEl.closest) return;
+
+          // A. Đổi giao diện Sáng / Tối (Dark / Light Mode)
+          var themeBtn = targetEl.closest('.VPSwitchAppearance');
+          if (themeBtn) {
+            var isDark = document.documentElement.classList.toggle('dark');
+            storageSet('vitepress-theme-appearance', isDark ? 'dark' : 'light');
+            syncDarkModeUI();
+            return;
+          }
+
+          // B. Đổi Ngôn ngữ (Language Switcher)
+          var langBtn = targetEl.closest('.lang-toggle-btn');
+          if (langBtn) {
+            if (langBtn.classList.contains('is-loading')) return;
+            langBtn.classList.add('is-loading');
+
+            var cur = readCurrentLang();
+            var targetLang = cur === 'en' ? 'vi' : 'en';
+            storageSet('study_doc_lang', targetLang);
+
+            setGoogleTransCookie(targetLang);
+            updateLanguageUI(targetLang === 'en');
+
+            var select = document.querySelector('.goog-te-combo');
+            if (select && select.value !== targetLang) {
+              select.value = targetLang;
+              select.dispatchEvent(new Event('change'));
+
+              if (targetLang === 'vi') {
                 setTimeout(function() {
                   window.location.reload();
                 }, 100);
+                return;
               }
-              return;
+              setTimeout(function() {
+                langBtn.classList.remove('is-loading');
+              }, 400);
+            } else {
+              setTimeout(function() {
+                window.location.reload();
+              }, 100);
             }
+            return;
+          }
 
-            // C. Bật / Tắt Sidebar trên Desktop
-            var sidebarBtn = e.target.closest('.sidebar-toggle-btn');
-            if (sidebarBtn) {
-              var isCollapsed = document.body.classList.toggle('sidebar-collapsed');
-              localStorage.setItem('vp-sidebar-collapsed', isCollapsed ? 'true' : 'false');
-              syncSidebarUI();
-              return;
-            }
+          // C. Bật / Tắt Sidebar trên Desktop
+          var sidebarBtn = targetEl.closest('.sidebar-toggle-btn');
+          if (sidebarBtn) {
+            var isCollapsed = document.body.classList.toggle('sidebar-collapsed');
+            storageSet('vp-sidebar-collapsed', isCollapsed ? 'true' : 'false');
+            syncSidebarUI();
+            return;
+          }
 
-            // D. Bật / Tắt Sidebar trên Mobile (Nút "Danh mục" trong VPLocalNav)
-            var localNavBtn = e.target.closest('.VPLocalNav .menu');
-            if (localNavBtn) {
-              var sidebar = document.querySelector('.VPSidebar');
-              if (sidebar) {
-                var isOpen = sidebar.classList.toggle('open');
-                localNavBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+          // D. Bật / Tắt Sidebar trên Mobile (Nút "Danh mục" trong VPLocalNav)
+          var localNavBtn = targetEl.closest('.VPLocalNav .menu');
+          if (localNavBtn) {
+            var sidebar = document.querySelector('.VPSidebar');
+            if (sidebar) {
+              var isOpen = sidebar.classList.toggle('open');
+              localNavBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
 
-                var backdrop = document.querySelector('.VPBackdrop');
-                if (!backdrop) {
-                  backdrop = document.createElement('div');
-                  backdrop.className = 'VPBackdrop backdrop';
-                  document.body.appendChild(backdrop);
-                }
-                backdrop.style.display = isOpen ? 'block' : 'none';
-                document.body.style.overflow = isOpen ? 'hidden' : '';
+              var backdrop = document.querySelector('.VPBackdrop');
+              if (!backdrop) {
+                backdrop = document.createElement('div');
+                backdrop.className = 'VPBackdrop backdrop';
+                document.body.appendChild(backdrop);
               }
-              return;
-            }
-
-            // E. Click Backdrop để đóng Mobile Sidebar hoặc Mobile Nav
-            var backdropEl = e.target.closest('.VPBackdrop');
-            if (backdropEl) {
-              var sidebar = document.querySelector('.VPSidebar');
-              if (sidebar) sidebar.classList.remove('open');
-              backdropEl.style.display = 'none';
-
-              var localNavBtn = document.querySelector('.VPLocalNav .menu');
-              if (localNavBtn) localNavBtn.setAttribute('aria-expanded', 'false');
-
-              document.body.classList.remove('nav-screen-open');
-              var hamburger = document.querySelector('.VPNavBarHamburger');
-              if (hamburger) {
-                hamburger.classList.remove('active');
-                hamburger.setAttribute('aria-expanded', 'false');
-              }
-
-              document.body.style.overflow = '';
-              return;
-            }
-
-            // F. Click link bên trong Sidebar trên mobile để tự động đóng drawer
-            if (e.target.closest('.VPSidebar a')) {
-              if (window.innerWidth < 960) {
-                var sidebar = document.querySelector('.VPSidebar');
-                if (sidebar) sidebar.classList.remove('open');
-                var backdrop = document.querySelector('.VPBackdrop');
-                if (backdrop) backdrop.style.display = 'none';
-                var localNavBtn = document.querySelector('.VPLocalNav .menu');
-                if (localNavBtn) localNavBtn.setAttribute('aria-expanded', 'false');
-                document.body.style.overflow = '';
-              }
-            }
-
-            // G. Bật / Tắt Menu Navbar trên Mobile (Nút 3 gạch hamburger)
-            var hamburgerBtn = e.target.closest('.VPNavBarHamburger');
-            if (hamburgerBtn) {
-              var isOpen = document.body.classList.toggle('nav-screen-open');
-              hamburgerBtn.classList.toggle('active', isOpen);
-              hamburgerBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+              backdrop.style.display = isOpen ? 'block' : 'none';
               document.body.style.overflow = isOpen ? 'hidden' : '';
-              return;
             }
+            return;
+          }
 
-            // H. Click link trong Mobile Navbar Menu để đóng menu
-            if (e.target.closest('.VPNavBarMenu a') && document.body.classList.contains('nav-screen-open')) {
-              document.body.classList.remove('nav-screen-open');
-              var hamburger = document.querySelector('.VPNavBarHamburger');
-              if (hamburger) {
-                hamburger.classList.remove('active');
-                hamburger.setAttribute('aria-expanded', 'false');
-              }
-              document.body.style.overflow = '';
-            }
+          // E. Click Backdrop để đóng Mobile Sidebar hoặc Mobile Nav
+          var backdropEl = targetEl.closest('.VPBackdrop');
+          if (backdropEl) {
+            closeMobileDrawers();
+            return;
+          }
 
-            // I. Thu gọn / Mở rộng mục trong Sidebar (Cây thư mục)
-            var sidebarItem = e.target.closest('.VPSidebarItem.collapsible > .item');
-            if (sidebarItem) {
-              var section = sidebarItem.parentElement;
-              section.classList.toggle('collapsed');
-              return;
-            }
+          // F. Bắt click link nội bộ để chuyển trang SPA mượt mà (ngăn iOS PWA thoát ra Safari "Done")
+          var linkEl = targetEl.closest('a, [data-spa-href]');
+          if (linkEl) {
+            var rawHref = linkEl.getAttribute('data-spa-href') || linkEl.getAttribute('href');
+            if (rawHref) {
+              var isSpecial = rawHref.indexOf('mailto:') === 0 || rawHref.indexOf('tel:') === 0 || rawHref.indexOf('javascript:') === 0;
+              var isBlank = linkEl.getAttribute('target') === '_blank';
+              var isDownload = linkEl.hasAttribute('download');
+              var hasModifier = e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || (typeof e.button === 'number' && e.button !== 0);
 
-            // J. Mở / Đóng menu dropdown trên Navbar (Desktop & Mobile)
-            var flyoutBtn = e.target.closest('.VPFlyout > .button, .VPFlyout .button');
-            if (flyoutBtn) {
-              var isExpanded = flyoutBtn.getAttribute('aria-expanded') === 'true';
-              // Đóng tất cả các flyout khác trước khi toggle
-              var allFlyouts = document.querySelectorAll('.VPFlyout > .button');
-              for (var f = 0; f < allFlyouts.length; f++) {
-                if (allFlyouts[f] !== flyoutBtn) {
-                  allFlyouts[f].setAttribute('aria-expanded', 'false');
-                }
-              }
-              flyoutBtn.setAttribute('aria-expanded', !isExpanded);
-              return;
-            }
-
-            // K. Đóng dropdown khi click ra ngoài
-            if (!e.target.closest('.VPFlyout')) {
-              var openFlyouts = document.querySelectorAll('.VPFlyout > .button[aria-expanded="true"]');
-              for (var k = 0; k < openFlyouts.length; k++) {
-                openFlyouts[k].setAttribute('aria-expanded', 'false');
-              }
-            }
-
-            // L. Nút "Lên đầu trang" trong VPLocalNavOutlineDropdown trên mobile
-            var returnToTopBtn = e.target.closest('.VPLocalNavOutlineDropdown button');
-            if (returnToTopBtn) {
-              window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
-              return;
-            }
-
-            // M. Bắt sự kiện click nút Copy Markdown
-            var copyBtn = e.target.closest('.copy-markdown-btn');
-            if (copyBtn) {
-              var rawEl = document.querySelector('.raw-markdown-content');
-              if (rawEl) {
+              if (!isSpecial && !isBlank && !isDownload && !hasModifier) {
+                var parsedUrl = null;
                 try {
-                  var base64 = rawEl.textContent.trim();
-                  var binString = atob(base64);
-                  var bytes = Uint8Array.from(binString, function(m) { return m.codePointAt(0); });
-                  var rawText = new TextDecoder().decode(bytes);
+                  parsedUrl = new URL(rawHref, window.location.href);
+                } catch (err) {}
 
-                  var doCopy = function(text) {
-                    if (navigator.clipboard && window.isSecureContext) {
-                      return navigator.clipboard.writeText(text);
-                    } else {
-                      var textarea = document.createElement('textarea');
-                      textarea.value = text;
-                      textarea.style.position = 'fixed';
-                      textarea.style.left = '-9999px';
-                      textarea.style.top = '-9999px';
-                      document.body.appendChild(textarea);
-                      textarea.focus();
-                      textarea.select();
-                      try {
-                        document.execCommand('copy');
-                        textarea.remove();
-                        return Promise.resolve();
-                      } catch (err) {
-                        textarea.remove();
-                        return Promise.reject(err);
-                      }
+                if (parsedUrl && parsedUrl.origin === window.location.origin) {
+                  var currentPath = window.location.pathname;
+                  var targetPath = parsedUrl.pathname;
+
+                  // Nếu là anchor hash cuộn trên cùng 1 trang (ví dụ #heading) -> đóng mobile drawer và để trình duyệt tự cuộn
+                  if (targetPath === currentPath && parsedUrl.search === window.location.search && parsedUrl.hash) {
+                    if (window.innerWidth < 960) {
+                      closeMobileDrawers();
                     }
-                  };
+                    return;
+                  }
 
-                  doCopy(rawText).then(function() {
-                    var textSpan = copyBtn.querySelector('.copy-text');
-                    var origText = textSpan ? textSpan.textContent : 'Sao chép Markdown';
-                    copyBtn.classList.add('copied');
-                    if (textSpan) textSpan.textContent = 'Đã sao chép!';
-                    setTimeout(function() {
-                      copyBtn.classList.remove('copied');
-                      if (textSpan) textSpan.textContent = origText;
-                    }, 2000);
-                  });
-                } catch (err) {
-                  console.error('Lỗi khi sao chép raw markdown:', err);
+                  // Nếu là link chuyển trang:
+                  e.preventDefault();
+                  closeMobileDrawers();
+                  navigateSpa(parsedUrl.href, true);
+                  return;
                 }
               }
-              return;
             }
-          });
+          }
 
-          // 5. Phím tắt Ctrl+B hoặc Cmd+B để Bật/Tắt Sidebar
+          // G. Bật / Tắt Menu Navbar trên Mobile (Nút 3 gạch hamburger)
+          var hamburgerBtn = targetEl.closest('.VPNavBarHamburger');
+          if (hamburgerBtn) {
+            var isOpen = document.body.classList.toggle('nav-screen-open');
+            hamburgerBtn.classList.toggle('active', isOpen);
+            hamburgerBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+            document.body.style.overflow = isOpen ? 'hidden' : '';
+            return;
+          }
+
+          // I. Thu gọn / Mở rộng mục trong Sidebar (Cây thư mục)
+          var sidebarItem = targetEl.closest('.VPSidebarItem.collapsible > .item');
+          if (sidebarItem) {
+            var section = sidebarItem.parentElement;
+            section.classList.toggle('collapsed');
+            return;
+          }
+
+          // J. Mở / Đóng menu dropdown trên Navbar (Desktop & Mobile)
+          var flyoutBtn = targetEl.closest('.VPFlyout > .button, .VPFlyout .button');
+          if (flyoutBtn) {
+            var isExpanded = flyoutBtn.getAttribute('aria-expanded') === 'true';
+            var allFlyouts = document.querySelectorAll('.VPFlyout > .button');
+            for (var f = 0; f < allFlyouts.length; f++) {
+              if (allFlyouts[f] !== flyoutBtn) {
+                allFlyouts[f].setAttribute('aria-expanded', 'false');
+              }
+            }
+            flyoutBtn.setAttribute('aria-expanded', !isExpanded);
+            return;
+          }
+
+          // K. Đóng dropdown khi click ra ngoài
+          if (!targetEl.closest('.VPFlyout')) {
+            var openFlyouts = document.querySelectorAll('.VPFlyout > .button[aria-expanded="true"]');
+            for (var k = 0; k < openFlyouts.length; k++) {
+              openFlyouts[k].setAttribute('aria-expanded', 'false');
+            }
+          }
+
+          // L. Nút "Lên đầu trang" trong VPLocalNavOutlineDropdown trên mobile
+          var returnToTopBtn = targetEl.closest('.VPLocalNavOutlineDropdown button');
+          if (returnToTopBtn) {
+            window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+            return;
+          }
+
+          // M. Bắt sự kiện click nút Copy Markdown
+          var copyBtn = targetEl.closest('.copy-markdown-btn');
+          if (copyBtn) {
+            var rawEl = document.querySelector('.raw-markdown-content');
+            if (rawEl) {
+              try {
+                var base64 = rawEl.textContent.trim();
+                var binString = atob(base64);
+                var bytes = Uint8Array.from(binString, function(m) { return m.codePointAt(0); });
+                var rawText = new TextDecoder().decode(bytes);
+
+                var doCopy = function(text) {
+                  if (navigator.clipboard && window.isSecureContext) {
+                    return navigator.clipboard.writeText(text);
+                  } else {
+                    var textarea = document.createElement('textarea');
+                    textarea.value = text;
+                    textarea.style.position = 'fixed';
+                    textarea.style.left = '-9999px';
+                    textarea.style.top = '-9999px';
+                    document.body.appendChild(textarea);
+                    textarea.focus();
+                    textarea.select();
+                    try {
+                      document.execCommand('copy');
+                      textarea.remove();
+                      return Promise.resolve();
+                    } catch (err) {
+                      textarea.remove();
+                      return Promise.reject(err);
+                    }
+                  }
+                };
+
+                doCopy(rawText).then(function() {
+                  var textSpan = copyBtn.querySelector('.copy-text');
+                  var origText = textSpan ? textSpan.textContent : 'Sao chép Markdown';
+                  copyBtn.classList.add('copied');
+                  if (textSpan) textSpan.textContent = 'Đã sao chép!';
+                  setTimeout(function() {
+                    copyBtn.classList.remove('copied');
+                    if (textSpan) textSpan.textContent = origText;
+                  }, 2000);
+                });
+              } catch (err) {
+                console.error('Lỗi khi sao chép raw markdown:', err);
+              }
+            }
+            return;
+          }
+
+          // N. Bắt sự kiện click nút Hỏi AI (Mở ChatGPT & tự động điền prompt)
+          var askAiBtn = targetEl.closest('.ask-ai-btn');
+          if (askAiBtn) {
+            var rawEl = document.querySelector('.raw-markdown-content');
+            var rawText = '';
+            if (rawEl) {
+              try {
+                var base64 = rawEl.textContent.trim();
+                var binString = atob(base64);
+                var bytes = Uint8Array.from(binString, function(m) { return m.codePointAt(0); });
+                rawText = new TextDecoder().decode(bytes);
+              } catch (err) {
+                console.error('Lỗi giải mã raw markdown:', err);
+              }
+            }
+
+            var productionBase = 'https://studying-docs.pages.dev';
+            var cleanPath = window.location.pathname.replace(/\.html$/, '');
+            var fullPublicUrl = productionBase + cleanPath;
+
+            if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1' && window.location.origin.indexOf('http') === 0) {
+              fullPublicUrl = window.location.origin + cleanPath;
+            }
+
+            var targetPrompt = 'Hãy đọc nội dung từ đường dẫn sau và giải thích đơn giản, dễ hiểu nhưng vẫn đầy đủ, chi tiết:\\n' + fullPublicUrl;
+            var chatGptLink = 'https://chatgpt.com/?hints=search&q=' + encodeURIComponent(targetPrompt);
+            var clipboardText = targetPrompt + (rawText ? '\\n\\n---\\n' + rawText : '');
+
+            if (clipboardText) {
+              try {
+                if (navigator.clipboard && window.isSecureContext) {
+                  navigator.clipboard.writeText(clipboardText);
+                }
+              } catch (err) {}
+            }
+
+            var aiText = askAiBtn.querySelector('.ai-text');
+            if (aiText) {
+              var originalText = aiText.textContent;
+              aiText.textContent = 'Đang mở ChatGPT...';
+              askAiBtn.classList.add('opening');
+              setTimeout(function() {
+                aiText.textContent = originalText;
+                askAiBtn.classList.remove('opening');
+              }, 2500);
+            }
+
+            var isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+            if (isMobile) {
+              window.location.href = chatGptLink;
+            } else {
+              window.open(chatGptLink, '_blank', 'noopener,noreferrer');
+            }
+            return;
+          }
+        }
+
+        // Đăng ký ngay lập tức ở Capture Phase để chặn mọi điều hướng gốc trên iOS WebKit
+        if (typeof document !== 'undefined') {
+          document.addEventListener('click', handleGlobalClick, true);
+        }
+
+        // 5. Phím tắt Ctrl+B / Cmd+B và Enter cho link PWA standalone
+        if (typeof document !== 'undefined') {
           document.addEventListener('keydown', function(e) {
-            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
+            if ((e.ctrlKey || e.metaKey) && e.key && e.key.toLowerCase() === 'b') {
               e.preventDefault();
               var isCollapsed = document.body.classList.toggle('sidebar-collapsed');
-              localStorage.setItem('vp-sidebar-collapsed', isCollapsed ? 'true' : 'false');
+              storageSet('vp-sidebar-collapsed', isCollapsed ? 'true' : 'false');
               syncSidebarUI();
+              return;
+            }
+            if (e.key === 'Enter' && e.target && e.target.getAttribute) {
+              var spaTarget = e.target.closest && e.target.closest('[data-spa-href]');
+              if (spaTarget) {
+                var spaHref = spaTarget.getAttribute('data-spa-href');
+                if (spaHref) {
+                  e.preventDefault();
+                  try {
+                    var u = new URL(spaHref, window.location.href);
+                    closeMobileDrawers();
+                    navigateSpa(u.href, true);
+                  } catch (err) {}
+                }
+              }
             }
           });
+        }
 
-          // 6. Tự động đóng mobile sidebar/menu khi thay đổi kích thước màn hình lên Desktop
+        // 6. Tự động đóng mobile sidebar/menu khi thay đổi kích thước màn hình lên Desktop
+        if (typeof window !== 'undefined') {
           window.addEventListener('resize', function() {
             if (window.innerWidth >= 960) {
-              var sidebar = document.querySelector('.VPSidebar');
-              if (sidebar) sidebar.classList.remove('open');
-              var backdrop = document.querySelector('.VPBackdrop');
-              if (backdrop) backdrop.style.display = 'none';
-              var localNavBtn = document.querySelector('.VPLocalNav .menu');
-              if (localNavBtn) localNavBtn.setAttribute('aria-expanded', 'false');
-              document.body.classList.remove('nav-screen-open');
-              var hamburger = document.querySelector('.VPNavBarHamburger');
-              if (hamburger) {
-                hamburger.classList.remove('active');
-                hamburger.setAttribute('aria-expanded', 'false');
-              }
-              document.body.style.overflow = '';
+              closeMobileDrawers();
             }
           });
-        });
+        }
+
+        // --- Khởi tạo UI khi DOM sẵn sàng ---
+        function initPageUi() {
+          if (storageGet('vp-sidebar-collapsed') === 'true') {
+            document.body.classList.add('sidebar-collapsed');
+          }
+          syncSidebarUI();
+          syncDarkModeUI();
+          var currentLang = readCurrentLang();
+          updateLanguageUI(currentLang === 'en');
+          neutralizeStandaloneLinks();
+          protectTechnicalElements();
+          renderMermaid();
+        }
 
         // 6. Bảo vệ phần tử kỹ thuật (Code, Math, Mermaid) không bị dịch nhầm
         function protectTechnicalElements() {
@@ -433,13 +628,9 @@ export default defineConfig({
         }
 
         if (document.readyState === 'loading') {
-          document.addEventListener('DOMContentLoaded', function() {
-            protectTechnicalElements();
-            renderMermaid();
-          });
+          document.addEventListener('DOMContentLoaded', initPageUi);
         } else {
-          protectTechnicalElements();
-          renderMermaid();
+          initPageUi();
         }
 
         // 8. Tự động re-render Mermaid & đồng bộ Dark Mode khi thuộc tính class thay đổi
@@ -454,12 +645,16 @@ export default defineConfig({
         });
         observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
 
-        // Đồng bộ lại UI nếu có navigation trong chế độ dev SPA
-        window.addEventListener('popstate', function() {
-          syncDarkModeUI();
-          syncSidebarUI();
-          var currentLang = readCurrentLang();
-          updateLanguageUI(currentLang === 'en');
+        // Đồng bộ lại UI và chuyển trang mượt mà khi người dùng bấm nút Back / Forward của trình duyệt
+        window.addEventListener('popstate', function(e) {
+          if (e.state && e.state.__spa) {
+            navigateSpa(window.location.href, false);
+          } else {
+            syncDarkModeUI();
+            syncSidebarUI();
+            var currentLang = readCurrentLang();
+            updateLanguageUI(currentLang === 'en');
+          }
         });
       })();
       `
